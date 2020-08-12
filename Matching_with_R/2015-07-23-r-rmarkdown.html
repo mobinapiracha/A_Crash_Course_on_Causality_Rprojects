@@ -1,0 +1,130 @@
+---
+title: 'Causal Inference with R: Matching'
+author: "Mobin A Piracha"
+date: '2015-07-23T21:13:14-05:00'
+categories: R
+tags:
+- R Markdown
+- plot
+- regression
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+  html_document:
+    df_print: paged
+---
+
+
+
+<p>The following is a data anlaysis project on Matching using R. This project is a apart of Coursera’s “A Crash Course on Causality” taught by The University of Pennsylvania. Matching is a technique used in Causal Inference in which we infer causal effects from observational data by matching treated and control subjects with roughly similar covariates in order to estimate causal effects. There are different types of matching such as greedy nearest neighbor, optimal matching. We will also conduct propensity score matching whereby we estimate the probability of treatment for subjects and match each treated and control subject based on their probability of treatment. We can match based on greedy nearest neighbor or any other matching method based on covariates after we have estimated the propensity scores.</p>
+<div id="impact-evaluation-of-national-supported-work-demonstration" class="section level1">
+<h1>Impact Evaluation of National Supported Work Demonstration</h1>
+<p>For this project, I will use Lalonda (1986) which is a labor training program, on post inervention income levels. The goal of this project is to estimate causal effect of this training program on income. First we will install packages “tableone”, “Matching” and “MatchIt”. Once you are done installing load the packages.</p>
+<p>Now we will load the data Lalonde which is a part of the MatchIt package.</p>
+<pre class="r"><code>data(&quot;lalonde&quot;)
+View(lalonde)</code></pre>
+<p>The data has 614 subjects and 10 variables. When we view the data we see variables age, educ, black, hispan, married, nodegree, re74 (real earnings in 1974). re75 (real earnings in 1975), re78 (real earnings in 1978). treat. The outcome variable is re78 which is the post intervention income. According to the data, the potential confounding variables are age, educ, black, hispan, married, nodegree, re74 and re75.</p>
+<p>Now, the following is the code for computing standardized differences for all confounding variables.
+We will create a dataset with just our required variables and then create a shortlist.</p>
+<p>Find the standardized differences for all of the confounding variables (pre-matching). What is the standardized difference for married (to nearest hundredth)?
+Now we shall create a table to look at the standardize mean differences of covariates before matching.</p>
+<pre class="r"><code>table1&lt;-CreateTableOne(vars = xvars, strata = &quot;treatment&quot;, data = mydata, test = FALSE)
+print(table1, smd=TRUE)
+##                        Stratified by treatment
+##                         0                 1                 SMD   
+##   n                         429               185                 
+##   age (mean (SD))         28.03 (10.79)     25.82 (7.16)     0.242
+##   education (mean (SD))   10.24 (2.86)      10.35 (2.01)     0.045
+##   black (mean (SD))        0.20 (0.40)       0.84 (0.36)     1.668
+##   married (mean (SD))      0.51 (0.50)       0.19 (0.39)     0.719
+##   nodegree (mean (SD))     0.60 (0.49)       0.71 (0.46)     0.235
+##   re74 (mean (SD))      5619.24 (6788.75) 2095.57 (4886.62)  0.596
+##   re75 (mean (SD))      2466.48 (3292.00) 1532.06 (3219.25)  0.287</code></pre>
+<p>The table shows the standardized mean differences of all co-variates pre-matching. We find that the standardized mean difference for married is 0.719.
+What is the raw (unadjusted) mean of real earnings in 1978 for treated subjects minus the mean of real earnings in 1978 for untreated subjects?</p>
+<pre><code>## [1] -635.0262</code></pre>
+<p>We find that the raw undjusted mean of real earnings for treated subjects minus control subjects for 1978 is -635.
+Now we will conduct greedy matching on Mahalobis distance. For this analysis we will use the Match package. We will calculate the standardized mean differences after matching and conduct an outcome analysis through a t-test.</p>
+<pre><code>##                        Stratified by treatment
+##                         0                 1                 SMD   
+##   n                         185               185                 
+##   age (mean (SD))         24.32 (9.42)      25.82 (7.16)     0.179
+##   education (mean (SD))   10.28 (2.37)      10.35 (2.01)     0.032
+##   black (mean (SD))        0.43 (0.50)       0.84 (0.36)     0.943
+##   married (mean (SD))      0.20 (0.40)       0.19 (0.39)     0.027
+##   nodegree (mean (SD))     0.69 (0.46)       0.71 (0.46)     0.035
+##   re74 (mean (SD))      2636.91 (4720.09) 2095.57 (4886.62)  0.113
+##   re75 (mean (SD))      1678.20 (2920.74) 1532.06 (3219.25)  0.048
+## 
+##  One Sample t-test
+## 
+## data:  difference
+## t = 1.1391, df = 184, p-value = 0.2561
+## alternative hypothesis: true mean is not equal to 0
+## 95 percent confidence interval:
+##  -575.7587 2148.8254
+## sample estimates:
+## mean of x 
+##  786.5334
+## 
+##  Wilcoxon signed rank test with continuity correction
+## 
+## data:  y_trt and y_con
+## V = 8717, p-value = 0.2185
+## alternative hypothesis: true location shift is not equal to 0</code></pre>
+<p>We matched using the greedy nearest neighbor matching using the mahalanobis distance. We found that our standardized mean differences were greater than 0,1 for age, black, and re74. For the variable black it was especially greater at 0.943. We found that our t-test was insignificant at the 95% level with a high p-value= 0.2646. A wilcox test is also not significant with a p-value=0.2185.
+Now we will conduct proposensity score matching using a logistic regression model. We will once again conduct greedy matching. We will use a caliper of 0.2.</p>
+<pre><code>## 
+## Call:
+## glm(formula = treatment ~ age + education + black + hispanic + 
+##     married + nodegree + re74 + re75, family = binomial(), data = mydata)
+## 
+## Deviance Residuals: 
+##     Min       1Q   Median       3Q      Max  
+## -1.7645  -0.4736  -0.2862   0.7508   2.7169  
+## 
+## Coefficients:
+##               Estimate Std. Error z value Pr(&gt;|z|)    
+## (Intercept) -4.729e+00  1.017e+00  -4.649 3.33e-06 ***
+## age          1.578e-02  1.358e-02   1.162  0.24521    
+## education    1.613e-01  6.513e-02   2.477  0.01325 *  
+## black        3.065e+00  2.865e-01  10.699  &lt; 2e-16 ***
+## hispanic     9.836e-01  4.257e-01   2.311  0.02084 *  
+## married     -8.321e-01  2.903e-01  -2.866  0.00415 ** 
+## nodegree     7.073e-01  3.377e-01   2.095  0.03620 *  
+## re74        -7.178e-05  2.875e-05  -2.497  0.01253 *  
+## re75         5.345e-05  4.635e-05   1.153  0.24884    
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## (Dispersion parameter for binomial family taken to be 1)
+## 
+##     Null deviance: 751.49  on 613  degrees of freedom
+## Residual deviance: 487.84  on 605  degrees of freedom
+## AIC: 505.84
+## 
+## Number of Fisher Scoring iterations: 5
+##                        Stratified by treatment
+##                         0                 1                 SMD   
+##   n                         111               111                 
+##   age (mean (SD))         26.27 (11.10)     26.22 (7.18)     0.006
+##   education (mean (SD))   10.37 (2.66)      10.25 (2.31)     0.047
+##   black (mean (SD))        0.72 (0.45)       0.74 (0.44)     0.040
+##   married (mean (SD))      0.24 (0.43)       0.24 (0.43)    &lt;0.001
+##   nodegree (mean (SD))     0.66 (0.48)       0.65 (0.48)     0.019
+##   re74 (mean (SD))      2704.56 (4759.89) 2250.49 (5746.14)  0.086
+##   re75 (mean (SD))      1969.10 (3169.08) 1222.25 (3081.19)  0.239
+## 
+##  One Sample t-test
+## 
+## data:  difference_1
+## t = 1.4824, df = 110, p-value = 0.1411
+## alternative hypothesis: true mean is not equal to 0
+## 95 percent confidence interval:
+##  -420.0273 2913.6398
+## sample estimates:
+## mean of x 
+##  1246.806</code></pre>
+<p>After fitting the model using logistic regression model and doing greedy propensity score matching. We matched 111 pairs with all standardized differences were lower than the 0.1 threshold except for re78. We also find that our mean difference was 1246.806. However, with a p-value=0.1441, our results were insignificant.</p>
+</div>
