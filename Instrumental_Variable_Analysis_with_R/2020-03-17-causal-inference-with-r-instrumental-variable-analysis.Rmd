@@ -21,11 +21,11 @@ image:
   preview_only: no
 projects: []
 output:
+  html_document:
+    df_print: paged
   prettydoc::html_pretty:
     theme: cayman
     highlight: github
-  html_document:
-    df_print: paged
 ---
 
 
