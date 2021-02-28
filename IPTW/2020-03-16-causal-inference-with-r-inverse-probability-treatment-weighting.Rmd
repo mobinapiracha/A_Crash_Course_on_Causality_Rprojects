@@ -1,31 +1,12 @@
 ---
 title: 'Causal Inference with R: IPTW '
-author: Mobin A Piracha
+author: "Mobin A Piracha"
 date: '2020-03-16'
-slug: causal-inference-with-r-inverse-probability-treatment-weighting
-categories:
-  - R
-tags:
-  - R Markdown
-  - Causal Inference
-  - causality
-  - Observational Data
 subtitle: 'Inverse Probability of Treatment Weighting with R'
 summary: 'Fit a marginal structural model using Inverse Probability Treatment Weighting'
 authors: []
 lastmod: '2020-03-16T16:58:12+05:00'
-featured: 
-image: 
-  caption: ''
-  focal_point: ''
-  preview_only: no
-projects: []
-output:
-  prettydoc::html_pretty:
-    theme: cayman
-    highlight: github
-  html_document:
-    df_print: paged
+output: rmarkdown::github_document
 ---
 
 The following is a data anlaysis project on Inverse Probability of Treatment Weighting (IPTW) using R. This project is a apart of Coursera's "A Crash Course on Causality" taught by The University of Pennsylvania. IPTW is a technique in R where we assign weights to treatment and control groups based on their propsensities scores in order to give subjects with similar characteristics in treated and control equal weights in order to mirror a randomized trial. Therefore, subjects in treatment and control groups with similar characteristics will be reweighted according to their propensity scores. IPTW creates a pseudo population by assigning inflating treated subjects with low propensity scores and deflating control subjects with high propensity scores. In most cases weighting is done because we have many more control subjects than we have treated so we assign more weight to treated subjects with low propensity scores in order to match them with control subjects with similar characteristics. 
@@ -33,23 +14,29 @@ The following is a data anlaysis project on Inverse Probability of Treatment Wei
 For this analysis we will use the National Supported Work (NSW) Demonstraton dataset which is a labor training program. We are interested in estimating causal effects of this training program. We will use IPTW to estimate causal effects. 
 
 ```{r}
+library(tidyverse)
 library(pacman)
 pacman::p_load(tableone, Matching, MatchIt, ipw, survey) 
 data("lalonde")
 age<-lalonde$age
 education<-lalonde$educ
-black<-lalonde$black
-hispanic<-lalonde$hispan
+#since race has more than 3 categories we'll convert it into a binary variable for each race
+lalonde$black <- ifelse(lalonde$race == 'black',1,0)
+lalonde$hispanic <- ifelse(lalonde$race == 'hispanic',1,0)
+lalonde$white <- ifelse(lalonde$race == 'white',1,0)
+black <- lalonde$black
+hispanic <- lalonde$hispanic
+white <- lalonde$white
 married<-lalonde$married
 nodegree<-lalonde$nodegree
 re74<-lalonde$re74
 re75<-lalonde$re75
 treatment<-lalonde$treat
 re78<-lalonde$re78
-mydata<- cbind(age, education, black, hispanic, married, nodegree, re74, re75, treatment, re78)
+mydata<- cbind(age, education, black, white, hispanic, married, nodegree, re74, re75, treatment, re78)
 mydata<- data.frame(mydata)
 View(mydata)
-xvars<- c("age","education","black","married","nodegree","re74", "re75")
+xvars<- c("age","education","black","white","hispanic","married","nodegree","re74", "re75")
 expit<- function(x){1/(1+exp(-x))}
 logit<-function(p){log(p)-log(1-p)}
 ```
@@ -57,7 +44,7 @@ logit<-function(p){log(p)-log(1-p)}
 First I will take a look at the pre-matching covariates through the tableone package. Then I will use the ipw package and create a propensity score model to get weights. I will also create a plot of weights comparing propensity score to weights.    
 
 ```{r}
-table1<- CreateTableOne(vars=xvars,strata="treatment", data=mydata, test=FALSE)
+table1 <- CreateTableOne(vars=xvars,strata="treatment", data=mydata, test=FALSE)
 print(table1,smd=TRUE)
 weightmodel<-ipwpoint(exposure = treatment, family = "binomial", link = "logit", denominator = ~ age+education+black+hispanic+married+nodegree+re74+re75, data = mydata)
 summary(weightmodel$ipw.weights)
