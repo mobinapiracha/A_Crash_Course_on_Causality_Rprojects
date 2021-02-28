@@ -1,0 +1,80 @@
+---
+title: 'Causal Inference with R: Instrumental Variable Analysis'
+author: "Mobin A Piracha"
+date: '2020-03-17'
+output: rmarkdown::github_document
+summary: Fit the Two-staged least squares (2SLS) model in order to estimate the causal
+  effect
+authors: []
+lastmod: '2020-03-17T18:43:33+05:00'
+subtitle: Using Instrumental Variables to estimate Causal Effects in Observational Data
+---
+
+
+The following is a data analysis project on Instrumental Variable Analysis using R.   Instrumental Variable aims to estimate causal effects through an instrument (Z). A valid instrument is one that is correlated with treatment but uncorrelated with outcome. The exclusion restriction is the requirement that the instrument be uncorrelated with outcome. For this analysis 
+I will use the AER package and I will load dataset (PSID1976 dataset) regarding labor force participation of married women. I will complete a series of questions on the following link, which is a practice exercise on instrumental variables on R-bloggers website: https://www.r-bloggers.com/instrumental-variables-in-r-exercises-part-1/
+
+
+
+```{r}
+library(tidyverse)
+library(psych)
+library(AER)
+library(ivpack)
+data("PSID1976")
+```
+
+Now I will conduct summary statistics to find potential candiates for Instrumental Variable Analysis
+
+```{r}
+summary(PSID1976)
+```
+
+After taking a look at the summary statistics and the all variables we find that father's education could act as an instrument for conducting instrumental variable analysis with 2SLS to estimate the returns to schooling. However, before we conduct analysis we will a standard OLS regression to show that when we regress log(wage) on education, we get biased estimates because of confounding. 
+
+```{r}
+PSID1976$log_wage<-log(PSID1976$wage)
+```
+
+If we regress log(wage) on education we get an error because there are no wages for females that did not participate in the workforce; wages are based on participation rate. Therefore, we would only want to conduct analysis on those individuals that were a part of the workforce. We do thi using the subset function. Then we regress log wages of education using the lm function. We then plot the data and make a line of best fit. 
+
+```{r}
+part_data <- subset(PSID1976, participation == "yes")
+OLS_Model<-lm(log_wage~education, data = part_data)
+summary(OLS_Model)
+{OLS_plot<-plot(log_wage~education, col = "blue", pch = 16, data = part_data, xlab="Education in Years", ylab="Log(Wages)", xlim= c(0, 17), ylim = c(-2, +4))
+abline()}
+```
+
+We find that on average, a one year increase in education leads to a 10.86% increase in wages. However, we believe that due to confounding, we have biased estimates. Therefore, we may use an instrument (father's education) in try to estimate causal effects. We beleive father's age is a valid instrument because it is correlated with education but not correlated with income. Let's run a correlation matrix. 
+
+```{r}
+library(psych)
+ivcor_mat <- part_data %>% 
+  select(log_wage, education, feducation) %>% 
+  corr.test()
+ivcor_mat
+```
+
+
+We find that father's education is strongly correlated with education (0.42), while very weakly correlated (0.08), therefore, we can consider the exclusion restriction to be strongly met. Now that we know the relationships between variables we will use the "ivpack" package to estimate causal effects using two-stage least squares (2SLS) procedure. We can do this procedure either through a series of regression or do it directly with one regression using the IV pack. However, standard errors may be incorrect. 
+
+```{r}
+firststage<-lm(education~feducation, data = part_data)
+predictvalues<- firststage$fitted.values
+stagetwo<- lm(part_data$log_wage~predictvalues)
+summary(stagetwo)
+ivmodel<-ivreg(log_wage~education,~ feducation, x = TRUE, data = part_data)
+robust.se(ivmodel)
+```
+
+Therefore, according to our IV estimates, given a one unit increase in father's education is associated with a 1 year increase in education leads to 5.9% increase in wages. 
+However, you may find that standard errors estimates may be inaccurate as these estimates are based on OLS estimates and we want estimates based on 2SLS robust estimates. Therefore, we can obtain robust estimates by using the IV pack. Now we will obtain 90% confidence intervels for both the OLS regression and 2SLS. 
+
+```{r}
+confint(OLS_Model, level = 0.9)
+confint(ivmodel, level = 0.9)
+```
+
+Therefore, if we repeated this exercise 100 times, 90% of the times our estimates would be between 0.084-0.132 for education in the OLS model, and between 0.001-0.116 for education in the IV model. 
+
