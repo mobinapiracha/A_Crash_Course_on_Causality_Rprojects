@@ -1,0 +1,119 @@
+---
+title: 'Causal Inference with R: Matching'
+author: "Mobin A Piracha"
+date: '2015-07-23T21:13:14-05:00'
+categories: R
+tags:
+- R Markdown
+- plot
+- regression
+output: rmarkdown::github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE)
+```
+
+
+The following is a data anlaysis project on Matching using R. This project is a apart of Coursera's "A Crash Course on Causality" taught by The University of Pennsylvania. Matching is a technique used in Causal Inference in which we infer causal effects from observational data by matching treated and control subjects with roughly similar covariates in order to estimate causal effects. There are different types of matching such as greedy nearest neighbor, optimal matching. We will also conduct propensity score matching whereby we estimate the probability of treatment for subjects and match each treated and control subject based on their probability of treatment. We can match based on greedy nearest neighbor or any other matching method based on covariates after we have estimated the propensity scores. 
+
+# Impact Evaluation of National Supported Work Demonstration
+
+For this project, I will use Lalonda (1986) which is a labor training program, on post inervention income levels. The goal of this project is to estimate causal effect of this training program on income. First we will install packages "tableone", "Matching" and "MatchIt". Once you are done installing load the packages. 
+
+```{r echo=FALSE}
+library(pacman)
+pacman::p_load(tableone, Matching, MatchIt, optmatch) 
+```
+
+Now we will load the data Lalonde which is a part of the MatchIt package.
+
+```{r}
+data("lalonde")
+View(lalonde)
+```
+
+The data has 614 subjects and 10 variables. When we view the data we see variables age, educ, black, hispan, married, nodegree, re74 (real earnings in 1974). re75 (real earnings in 1975), re78 (real earnings in 1978). treat. The outcome variable is re78 which is the post intervention income. According to the data, the potential confounding variables are age, educ, black, hispan, married, nodegree, re74 and re75.
+
+Now, the following is the code for computing standardized differences for all confounding variables. 
+We will create a dataset with just our required variables and then create a shortlist. 
+
+```{r echo=FALSE}
+age<-lalonde$age
+education<-lalonde$educ
+lalonde$black <- ifelse(lalonde$race == 'black',1,0)
+lalonde$hispanic <- ifelse(lalonde$race == 'hispanic',1,0)
+lalonde$white <- ifelse(lalonde$race == 'white',1,0)
+black<-lalonde$black
+hispanic<-lalonde$hispan
+white <- lalonde$white
+married<-lalonde$married
+nodegree<-lalonde$nodegree
+re74<-lalonde$re74
+re75<-lalonde$re75
+treatment<-lalonde$treat
+re78<-lalonde$re78
+mydata<- cbind(age, education, black, hispanic, white, married, nodegree, re74, re75, treatment, re78)
+mydata<- data.frame(mydata)
+View(mydata)
+xvars<- c("age","education","black","white","hispanic","married","nodegree","re74", "re75")
+```
+
+Find the standardized differences for all of the confounding variables (pre-matching). What is the standardized difference for married (to nearest hundredth)?
+Now we shall create a table to look at the standardize mean differences of covariates before matching. 
+
+```{r}
+table1<-CreateTableOne(vars = xvars, strata = "treatment", data = mydata, test = FALSE)
+print(table1, smd=TRUE)
+```
+
+The table shows the standardized mean differences of all co-variates pre-matching. We find that the standardized mean difference for married is 0.719. 
+What is the raw (unadjusted) mean of real earnings in 1978 for treated subjects minus the mean of real earnings in 1978 for untreated subjects?
+
+```{r echo=FALSE}
+mean_treated<- mean(mydata$re78[mydata$treatment==1])
+mean_control<-mean(mydata$re78[mydata$treatment==0])
+raw_earnings78<-mean_treated-mean_control
+raw_earnings78
+```
+
+We find that the raw undjusted mean of real earnings for treated subjects minus control subjects for 1978 is -635.
+Now we will conduct greedy matching on Mahalobis distance. For this analysis we will use the Match package. We will calculate the standardized mean differences after matching and conduct an outcome analysis through a t-test.
+
+```{r echo=FALSE}
+greedymatch<-Match(Tr=treatment, M=1, X=mydata[xvars], replace = FALSE)
+matched<-mydata[unlist(greedymatch[c("index.treated","index.control")]), ]
+
+matchedtab1<-CreateTableOne(vars = xvars, strata = "treatment", data = matched, test = FALSE)
+print(matchedtab1, smd = TRUE)
+
+y_trt<-matched$re78[matched$treatment==1]
+y_con<-matched$re78[matched$treatment==0]
+
+difference<-y_trt-y_con
+t.test(difference)
+
+wilcox.test(y_trt,y_con, paired = TRUE)
+```
+
+We matched using the greedy nearest neighbor matching using the mahalanobis distance. We found that our standardized mean differences were greater than 0,1 for age, black, and re74. For the variable black it was especially greater at 0.943. We found that our t-test was insignificant at the 95% level with a high p-value= 0.2646. A wilcox test is also not significant with a p-value=0.2185. 
+Now we will conduct proposensity score matching using a logistic regression model. We will once again conduct greedy matching. We will use a caliper of 0.2. 
+
+```{r echo=FALSE}
+psmodel<-glm(treatment~age+education+black+hispanic+married+nodegree+re74+re75, data = mydata, family = binomial())
+summary(psmodel)
+pscore<-psmodel$fitted.values
+set.seed(931139)
+psmatch<-Match(Tr=mydata$treatment, M=1, X=pscore,replace = FALSE, caliper = 0.1)
+matched1<-mydata[unlist(psmatch[c("index.treated","index.control")]), ]
+matchedtab2<-CreateTableOne(vars = xvars, strata = "treatment", data = matched1, test = FALSE)
+print(matchedtab2, smd = TRUE)
+y_trt1<-matched1$re78[matched1$treatment==1]
+y_con1<-matched1$re78[matched1$treatment==0]
+
+difference_1<-y_trt1-y_con1
+t.test(difference_1)
+
+```
+
+After fitting the model using logistic regression model and doing greedy propensity score matching. We matched 111 pairs with all standardized differences were lower than the 0.1 threshold except for re78. We also find that our mean difference was 1246.806. However, with a p-value=0.1441, our results were insignificant. 

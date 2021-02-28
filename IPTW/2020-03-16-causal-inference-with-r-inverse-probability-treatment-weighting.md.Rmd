@@ -1,0 +1,85 @@
+---
+title: 'Causal Inference with R: IPTW '
+author: "Mobin A Piracha"
+date: '2020-03-16'
+subtitle: 'Inverse Probability of Treatment Weighting with R'
+summary: 'Fit a marginal structural model using Inverse Probability Treatment Weighting'
+authors: []
+lastmod: '2020-03-16T16:58:12+05:00'
+output: rmarkdown::github_document
+---
+
+The following is a data anlaysis project on Inverse Probability of Treatment Weighting (IPTW) using R. This project is a apart of Coursera's "A Crash Course on Causality" taught by The University of Pennsylvania. IPTW is a technique in R where we assign weights to treatment and control groups based on their propsensities scores in order to give subjects with similar characteristics in treated and control equal weights in order to mirror a randomized trial. Therefore, subjects in treatment and control groups with similar characteristics will be reweighted according to their propensity scores. IPTW creates a pseudo population by assigning inflating treated subjects with low propensity scores and deflating control subjects with high propensity scores. In most cases weighting is done because we have many more control subjects than we have treated so we assign more weight to treated subjects with low propensity scores in order to match them with control subjects with similar characteristics. 
+
+For this analysis we will use the National Supported Work (NSW) Demonstraton dataset which is a labor training program. We are interested in estimating causal effects of this training program. We will use IPTW to estimate causal effects. 
+
+```{r}
+library(tidyverse)
+library(pacman)
+pacman::p_load(tableone, Matching, MatchIt, ipw, survey) 
+data("lalonde")
+age<-lalonde$age
+education<-lalonde$educ
+#since race has more than 3 categories we'll convert it into a binary variable for each race
+lalonde$black <- ifelse(lalonde$race == 'black',1,0)
+lalonde$hispanic <- ifelse(lalonde$race == 'hispanic',1,0)
+lalonde$white <- ifelse(lalonde$race == 'white',1,0)
+black <- lalonde$black
+hispanic <- lalonde$hispanic
+white <- lalonde$white
+married<-lalonde$married
+nodegree<-lalonde$nodegree
+re74<-lalonde$re74
+re75<-lalonde$re75
+treatment<-lalonde$treat
+re78<-lalonde$re78
+mydata<- cbind(age, education, black, white, hispanic, married, nodegree, re74, re75, treatment, re78)
+mydata<- data.frame(mydata)
+View(mydata)
+xvars<- c("age","education","black","white","hispanic","married","nodegree","re74", "re75")
+expit<- function(x){1/(1+exp(-x))}
+logit<-function(p){log(p)-log(1-p)}
+```
+
+First I will take a look at the pre-matching covariates through the tableone package. Then I will use the ipw package and create a propensity score model to get weights. I will also create a plot of weights comparing propensity score to weights.    
+
+```{r}
+table1 <- CreateTableOne(vars=xvars,strata="treatment", data=mydata, test=FALSE)
+print(table1,smd=TRUE)
+weightmodel<-ipwpoint(exposure = treatment, family = "binomial", link = "logit", denominator = ~ age+education+black+hispanic+married+nodegree+re74+re75, data = mydata)
+summary(weightmodel$ipw.weights)
+ipwplot(weights = weightmodel$ipw.weights, logscale = FALSE, main = "weights", xlim = c(0, 41))
+mydata$wt<-weightmodel$ipw.weights
+weighteddata<- svydesign(ids = ~1, data = mydata, weights = ~wt)
+weightedtable<- svyCreateTableOne(vars = xvars, strata = "treatment", data = weighteddata, test = FALSE)
+print(weightedtable, smd=TRUE)
+```
+
+Pre-Matching standardized mean differences are first calculated. As you can see these differences are much higher than the usual threshold of 0.2. After calculating weights we find that our weights are between 1 and 40. Density plot shows us observations and where majority of the weights. Density plot shows that the majority of the subjects have low values between 1-5 after which some subjects have values between 10-20 and very few have a weight above 30. The matching table after assigning weights shows us that standardized differences are below the 0.2 threshold for almost all covariates. 
+Now I wll calculate the risk difference. I will calculate risk difference by fitting a marginal structural model in the survey package. 
+
+```{r}
+msm<- (svyglm(re78~treatment, design = svydesign(~1, weights = ~wt, data = mydata)))
+coef(msm)
+confint(msm)
+summary(msm)
+```
+
+After estimating coefficients and confidence intervels, we find that our estimate is insignificant at the 95% level. Now we will truncate weights at 1st and 99th percentiles throught the trunc option in sylglm. We can simply copy paste the code and add the truncated weights. 
+
+```{r}
+weightmodel_trunc<-ipwpoint(exposure = treatment, family = "binomial", link = "logit", denominator = ~ age+education+black+hispanic+married+nodegree+re74+re75, data = mydata, trunc = 0.01)
+summary(weightmodel_trunc$weights.trunc)
+ipwplot(weights = weightmodel_trunc$weights.trunc, logscale = FALSE, main = "weights", xlim = c(0, 13))
+mydata$wt_trunc<-weightmodel_trunc$weights.trunc
+weighteddata_trunc<- svydesign(ids = ~1, data = mydata, weights = ~wt_trunc)
+weightedtable_trunc<- svyCreateTableOne(vars = xvars, strata = "treatment", data = weighteddata_trunc, test = FALSE)
+print(weightedtable_trunc, smd=TRUE)
+msm_trunc<- (svyglm(re78~treatment, design = svydesign(~1, weights = ~wt_trunc, data = mydata)))
+coef(msm_trunc)
+confint(msm_trunc)
+summary(msm_trunc)
+```
+
+After assgining weights and truncating them, we find that our weights are now between 1 and 13. Density plot shows that the majority of the weights assigned are between 1 and 3, with some between 4-7 and very few afterwards. Summary shows us that the estimates are not significant at the 95% level.
+
