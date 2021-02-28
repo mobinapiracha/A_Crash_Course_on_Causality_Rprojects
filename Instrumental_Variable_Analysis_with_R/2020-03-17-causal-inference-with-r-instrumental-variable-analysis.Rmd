@@ -1,35 +1,17 @@
 ---
 title: 'Causal Inference with R: Instrumental Variable Analysis'
-author: Mobin A Piracha
+author: "Mobin A Piracha"
 date: '2020-03-17'
-slug: causal-inference-with-r-instrumental-variable-analysis
-categories:
-  - R
-tags:
-  - R Markdown
-  - Causal Inference
-  - causality
-  - Observational Data
-subtitle: 'Using Instrumental Variables to estimate Causal Effects in Observational Data'
-summary: 'Fit the Two-staged least squares (2SLS) model in order to estimate the causal effect'
+output: rmarkdown::github_document
+summary: Fit the Two-staged least squares (2SLS) model in order to estimate the causal
+  effect
 authors: []
 lastmod: '2020-03-17T18:43:33+05:00'
-featured: no
-image: 
-  caption: ''
-  focal_point: ''
-  preview_only: no
-projects: []
-output:
-  html_document:
-    df_print: paged
-  prettydoc::html_pretty:
-    theme: cayman
-    highlight: github
+subtitle: Using Instrumental Variables to estimate Causal Effects in Observational Data
 ---
 
 
-The following is a data anlaysis project on Instrumental Variable Analysis using R.   Instrumental Variable aims to estimate causal effects through an instrument (Z). A valid instrument is one that is correlated with treatment but uncorrelated with outcome. The exclusion restriction is the requirement that the instrument be uncorrelated with outcome. For this analysis 
+The following is a data analysis project on Instrumental Variable Analysis using R.   Instrumental Variable aims to estimate causal effects through an instrument (Z). A valid instrument is one that is correlated with treatment but uncorrelated with outcome. The exclusion restriction is the requirement that the instrument be uncorrelated with outcome. For this analysis 
 I will use the AER package and I will load dataset (PSID1976 dataset) regarding labor force participation of married women. I will complete a series of questions on the following link, which is a practice exercise on instrumental variables on R-bloggers website: https://www.r-bloggers.com/instrumental-variables-in-r-exercises-part-1/
 
 

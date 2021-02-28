@@ -7,12 +7,7 @@ tags:
 - R Markdown
 - plot
 - regression
-output:
-  prettydoc::html_pretty:
-    theme: cayman
-    highlight: github
-  html_document:
-    df_print: paged
+output: rmarkdown::github_document
 ---
 
 ```{r setup, include=FALSE}
@@ -46,18 +41,22 @@ We will create a dataset with just our required variables and then create a shor
 ```{r echo=FALSE}
 age<-lalonde$age
 education<-lalonde$educ
+lalonde$black <- ifelse(lalonde$race == 'black',1,0)
+lalonde$hispanic <- ifelse(lalonde$race == 'hispanic',1,0)
+lalonde$white <- ifelse(lalonde$race == 'white',1,0)
 black<-lalonde$black
 hispanic<-lalonde$hispan
+white <- lalonde$white
 married<-lalonde$married
 nodegree<-lalonde$nodegree
 re74<-lalonde$re74
 re75<-lalonde$re75
 treatment<-lalonde$treat
 re78<-lalonde$re78
-mydata<- cbind(age, education, black, hispanic, married, nodegree, re74, re75, treatment, re78)
+mydata<- cbind(age, education, black, hispanic, white, married, nodegree, re74, re75, treatment, re78)
 mydata<- data.frame(mydata)
 View(mydata)
-xvars<- c("age","education","black","married","nodegree","re74", "re75")
+xvars<- c("age","education","black","white","hispanic","married","nodegree","re74", "re75")
 ```
 
 Find the standardized differences for all of the confounding variables (pre-matching). What is the standardized difference for married (to nearest hundredth)?
